@@ -1,0 +1,113 @@
+{
+  "server": {
+    "port": 502,
+    "read_timeout": "30s",
+    "write_timeout": "30s",
+    "max_connections": 10000,
+    "graceful_timeout": "10s"
+  },
+  "network": {
+    "interface": "eth0",
+    "ip_ranges": [
+      {
+        "start": "192.168.1.101",
+        "end": "192.168.1.200"
+      }
+    ]
+  },
+  "slaves": {
+    "count": 100,
+    "unit_id_start": 1,
+    "default_registers": [
+      {
+        "address": 40001,
+        "name": "LineVoltage",
+        "data_type": "uint16",
+        "scale": 10,
+        "default_value": 220.0,
+        "unit": "V",
+        "writable": false
+      },
+      {
+        "address": 40002,
+        "name": "LineCurrent",
+        "data_type": "uint16",
+        "scale": 100,
+        "default_value": 15.5,
+        "unit": "A",
+        "writable": false
+      },
+      {
+        "address": 40003,
+        "name": "Frequency",
+        "data_type": "uint16",
+        "scale": 100,
+        "default_value": 60.0,
+        "unit": "Hz",
+        "writable": false
+      },
+      {
+        "address": 40004,
+        "name": "TotalEnergy",
+        "data_type": "uint32",
+        "scale": 1,
+        "default_value": 0,
+        "unit": "kWh",
+        "writable": false
+      },
+      {
+        "address": 40006,
+        "name": "PowerFactor",
+        "data_type": "uint16",
+        "scale": 1000,
+        "default_value": 0.95,
+        "unit": "",
+        "writable": false
+      },
+      {
+        "address": 40007,
+        "name": "ActivePower",
+        "data_type": "uint32",
+        "scale": 10,
+        "default_value": 3300,
+        "unit": "W",
+        "writable": false
+      }
+    ]
+  },
+  "scenario": {
+    "default_scenario": "normal",
+    "update_interval": "1s",
+    "scenarios": {
+      "normal": {
+        "enabled": true,
+        "voltage_variance": 0.005,
+        "frequency_variance": 0.0005
+      },
+      "voltage_sag": {
+        "enabled": true,
+        "duration": "10s",
+        "voltage_variance": 0.2
+      },
+      "jitter": {
+        "enabled": true,
+        "jitter_min": "100ms",
+        "jitter_max": "500ms"
+      },
+      "packet_loss": {
+        "enabled": true,
+        "packet_loss_rate": 0.05
+      }
+    }
+  },
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "output_path": "stdout"
+  },
+  "metrics": {
+    "enabled": true,
+    "endpoint": "/metrics",
+    "port": 9090
+  }
+}

@@ -1,0 +1,80 @@
+services:
+  modbussim:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${VERSION:-1.0.0}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+
+    # 使用 host 網路模式以支援 IP aliasing
+    network_mode: host
+
+    # 網路管理權限
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+    # 配置掛載
+    volumes:
+      - ./configs:/app/configs:ro
+      - /var/run:/var/run
+
+    # 環境變數
+    environment:
+      - TZ=Asia/Taipei
+      - MODBUSSIM_SERVER_PORT=502
+      - MODBUSSIM_METRICS_PORT=9090
+
+    # 資源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 512M
+
+    # 重啟策略
+    restart: unless-stopped
+
+    # 日誌配置
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # 可選: Prometheus 監控
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    network_mode: host
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.listen-address=:9091'
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # 可選: Grafana 儀表板
+  grafana:
+    image: grafana/grafana:10.0.0
+    network_mode: host
+    environment:
+      - GF_SERVER_HTTP_PORT=3000
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+volumes:
+  prometheus_data:
+  grafana_data:
