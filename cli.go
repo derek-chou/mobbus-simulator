@@ -89,6 +89,19 @@ var startCmd = &cobra.Command{
 			return fmt.Errorf("啟動引擎失敗: %w", err)
 		}
 
+		// 啟動指標收集器
+		if appConfig.Metrics.Enabled {
+			metrics := NewMetricsCollector(engine, logger)
+			if err := metrics.Start(appConfig.Metrics.Endpoint, appConfig.Metrics.Port); err != nil {
+				logger.Warn("啟動指標伺服器失敗", zap.Error(err))
+			} else {
+				logger.Info("指標伺服器已啟動",
+					zap.Int("port", appConfig.Metrics.Port),
+					zap.String("endpoint", appConfig.Metrics.Endpoint),
+				)
+			}
+		}
+
 		// 等待信號
 		sig := <-sigChan
 		logger.Info("收到關閉信號", zap.String("signal", sig.String()))
