@@ -140,32 +140,26 @@ func (s *Slave) Start(ctx context.Context) error {
 	// 設定暫存器資料
 	s.syncRegistersToServer()
 
+	// 啟動伺服器 (ListenTCP 同步建立 listener，內部以 goroutine accept)
+	s.stats.StartTime = time.Now()
+	addr := fmt.Sprintf("%s:%d", s.IP.String(), s.Port)
+
+	if err := s.server.ListenTCP(addr); err != nil {
+		s.state.Store(int32(SlaveStateStopped))
+		return fmt.Errorf("監聽 %s 失敗: %w", addr, err)
+	}
+
 	// 啟動場景更新
 	s.scenarioCtx, s.scenarioStop = context.WithCancel(ctx)
 	go s.runScenarioUpdater()
 
-	// 啟動伺服器
-	s.stats.StartTime = time.Now()
-	addr := fmt.Sprintf("%s:%d", s.IP.String(), s.Port)
+	s.state.Store(int32(SlaveStateRunning))
 
 	s.logger.Info("Slave 已啟動",
 		zap.String("id", s.ID),
 		zap.String("addr", addr),
 		zap.Uint8("unitID", s.UnitID),
 	)
-
-	// 在背景運行伺服器
-	go func() {
-		if err := s.server.ListenTCP(addr); err != nil {
-			if s.State() != SlaveStateStopping && s.State() != SlaveStateStopped {
-				s.logger.Error("Slave 伺服器錯誤", zap.String("id", s.ID), zap.Error(err))
-			}
-		}
-	}()
-
-	// 等待伺服器啟動
-	time.Sleep(10 * time.Millisecond)
-	s.state.Store(int32(SlaveStateRunning))
 
 	return nil
 }

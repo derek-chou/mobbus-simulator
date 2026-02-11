@@ -307,23 +307,46 @@ func (e *Engine) GetScenario() ScenarioType {
 
 // getBindIPs 取得要綁定的 IP 列表
 func (e *Engine) getBindIPs() ([]net.IP, error) {
-	// 如果有配置 IP 範圍，使用配置的範圍
+	// 如果有配置 IP 範圍，先展開再驗證
 	if len(e.config.Network.IPRanges) > 0 {
-		return e.config.ExpandIPRanges()
+		configuredIPs, err := e.config.ExpandIPRanges()
+		if err != nil {
+			return nil, err
+		}
+
+		// 取得本機可用 IP
+		localSet := getLocalIPSet()
+
+		// 過濾出本機實際存在的 IP
+		var available []net.IP
+		for _, ip := range configuredIPs {
+			if localSet[ip.String()] {
+				available = append(available, ip)
+			}
+		}
+
+		if len(available) > 0 {
+			return available, nil
+		}
+
+		// 配置的 IP 都不在本機上，回退到 0.0.0.0
+		e.logger.Warn("配置的 IP 範圍不存在於本機，回退為 0.0.0.0",
+			zap.Int("configured", len(configuredIPs)),
+		)
 	}
 
-	// 否則使用本地 IP
+	// 使用本地 IP 或 0.0.0.0
 	localIPs, err := getLocalIPs()
 	if err != nil {
 		return nil, err
 	}
 
-	// 如果沒有本地 IP，使用 0.0.0.0
 	if len(localIPs) == 0 {
 		return []net.IP{net.ParseIP("0.0.0.0")}, nil
 	}
 
-	// 如果 Slave 數量大於本地 IP 數量，複製 IP
+	// 如果 Slave 數量大於本地 IP 數量，以不同埠號複用
+	// 但此處僅返回可用 IP，由 Engine 分配
 	ips := make([]net.IP, 0, e.config.Slaves.Count)
 	for len(ips) < e.config.Slaves.Count {
 		for _, ip := range localIPs {
@@ -358,4 +381,24 @@ func getLocalIPs() ([]net.IP, error) {
 	}
 
 	return ips, nil
+}
+
+// getLocalIPSet 取得本機所有 IP 的 set (含 loopback)
+func getLocalIPSet() map[string]bool {
+	set := make(map[string]bool)
+
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return set
+	}
+
+	for _, addr := range addrs {
+		if ipNet, ok := addr.(*net.IPNet); ok {
+			if ipNet.IP.To4() != nil {
+				set[ipNet.IP.String()] = true
+			}
+		}
+	}
+
+	return set
 }
